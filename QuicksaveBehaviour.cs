@@ -111,11 +111,16 @@ public class QuicksaveBehaviour : MonoBehaviour
             return;
         }
 
-        CheckpointManager.ReloadCheckpoint();
-        if (!capture.IsRecalling && !CheckpointManager.IsReloadingCheckpoint)
+        try
         {
             capture.InitCheckpointRecall();
-            SNet.Sync.StartRecallCheckpointWithAllSyncedPlayers();
+            capture.RecallGameState(eBufferType.Checkpoint);
+        }
+        catch (Exception ex)
+        {
+            Plugin.LogSource.LogError($"Checkpoint load failed: {ex}");
+            Notify("Checkpoint load failed");
+            return;
         }
 
         Notify("Loading checkpoint");
