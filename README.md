@@ -1,0 +1,2 @@
+# GTFO-quicksave
+PRESS F5 TO SAVE, PRESS F9 TO LOAD
