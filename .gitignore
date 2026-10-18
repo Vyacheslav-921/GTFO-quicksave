@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+.idea/
+TestResults/
+
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.log
+*.dll
+*.pdb
+*.deps.json

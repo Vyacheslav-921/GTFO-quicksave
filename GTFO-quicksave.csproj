@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<Profile>my-mod</Profile>
+		<TargetFramework>net6.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<DebugType>None</DebugType>
+		<GenerateDependencyFile>false</GenerateDependencyFile>
+		<AssemblyName>GTFO-quicksave</AssemblyName>
+		<RootNamespace>GTFOQuicksave</RootNamespace>
+		<BepInEx>$(AppData)\r2modmanPlus-local\GTFO\profiles\$(Profile)\BepInEx</BepInEx>
+		<OutputPath>$(BepInEx)\plugins\$(AssemblyName)\</OutputPath>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+	</PropertyGroup>
+	<Target Name="DeleteDepsJson" AfterTargets="Build">
+		<Delete Files="$(OutputPath)$(AssemblyName).deps.json" ContinueOnError="true" />
+	</Target>
+	<ItemGroup>
+		<Reference Include="$(BepInEx)\core\0Harmony.dll" Private="false" />
+		<Reference Include="$(BepInEx)\core\BepInEx.Core.dll" Private="false" />
+		<Reference Include="$(BepInEx)\core\BepInEx.Unity.IL2CPP.dll" Private="false" />
+		<Reference Include="$(BepInEx)\core\Il2CppInterop.Common.dll" Private="false" />
+		<Reference Include="$(BepInEx)\core\Il2CppInterop.Runtime.dll" Private="false" />
+		<Reference Include="$(BepInEx)\interop\*.dll" Private="false" />
+		<Reference Remove="$(BepInEx)\interop\netstandard.dll" />
+	</ItemGroup>
+</Project>
