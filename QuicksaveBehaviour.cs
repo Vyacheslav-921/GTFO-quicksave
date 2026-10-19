@@ -9,9 +9,12 @@ public class QuicksaveBehaviour : MonoBehaviour
 {
     public const float DoublePressWindow = 1f;
     private const float CaptureTimeout = 5f;
+    private const float WipeDamage = 1000f;
+    private const int LoadPressesRequired = 3;
 
     private float _saveArmedAt;
     private float _loadArmedAt;
+    private int _loadPresses;
     private bool _capturePending;
     private float _captureStartedAt;
     private Vector3 _pendingPosition;
@@ -33,6 +36,7 @@ public class QuicksaveBehaviour : MonoBehaviour
         {
             _saveArmedAt = 0f;
             _loadArmedAt = 0f;
+            _loadPresses = 0;
             _capturePending = false;
             return;
         }
@@ -44,7 +48,7 @@ public class QuicksaveBehaviour : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F5))
             OnDoublePress(ref _saveArmedAt, now, "Press F5 again to save", Save);
         else if (Input.GetKeyDown(KeyCode.F9))
-            OnDoublePress(ref _loadArmedAt, now, "Press F9 again to load", Load);
+            OnLoadPress(now);
     }
 
     private void OnDoublePress(ref float armedAt, float now, string armMessage, Action commit)
@@ -58,6 +62,25 @@ public class QuicksaveBehaviour : MonoBehaviour
 
         armedAt = now;
         Notify(armMessage);
+    }
+
+    private void OnLoadPress(float now)
+    {
+        if (_loadArmedAt <= 0f || now - _loadArmedAt > DoublePressWindow)
+            _loadPresses = 0;
+
+        _loadPresses++;
+        _loadArmedAt = now;
+        if (_loadPresses < LoadPressesRequired)
+        {
+            var remaining = LoadPressesRequired - _loadPresses;
+            Notify(remaining == 1 ? "Press F9 once more to load" : "Press F9 twice more to load");
+            return;
+        }
+
+        _loadPresses = 0;
+        _loadArmedAt = 0f;
+        Load();
     }
 
     private void Save()
@@ -104,17 +127,34 @@ public class QuicksaveBehaviour : MonoBehaviour
             return;
         }
 
-        var capture = SNet.Capture;
-        if (capture == null || capture.IsCapturing || capture.IsRecalling)
+        var players = PlayerManager.PlayerAgentsInLevel;
+        if (players == null || players.Count == 0)
         {
-            Notify("Checkpoint is busy");
+            Notify("Checkpoint load failed");
             return;
         }
 
         try
         {
-            capture.InitCheckpointRecall();
-            capture.RecallGameState(eBufferType.Checkpoint);
+            var hit = false;
+            for (var i = 0; i < players.Count; i++)
+            {
+                var player = players[i];
+                if (player == null || !player.Alive || player.Damage == null)
+                    continue;
+
+                // The first hit downs a standing player. The second finishes them so the wipe reload starts.
+                player.Damage.FallDamage(WipeDamage);
+                if (player.Alive)
+                    player.Damage.FallDamage(WipeDamage);
+                hit = true;
+            }
+
+            if (!hit)
+            {
+                Notify("Checkpoint load failed");
+                return;
+            }
         }
         catch (Exception ex)
         {

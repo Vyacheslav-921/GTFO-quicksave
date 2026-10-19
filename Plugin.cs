@@ -19,6 +19,6 @@ public class Plugin : BasePlugin
 
         AddComponent<QuicksaveBehaviour>();
         new Harmony("levi.gtfo-quicksave").PatchAll();
-        Log.LogInfo("Host double-taps F5 to save a checkpoint and F9 to load it.");
+        Log.LogInfo("Host double-taps F5 to save a checkpoint and presses F9 three times to load it.");
     }
 }
