@@ -10,6 +10,7 @@ public class QuicksaveBehaviour : MonoBehaviour
     public const float DoublePressWindow = 1f;
     private const float CaptureTimeout = 5f;
     private const float WipeDamage = 1000f;
+    private const float WipeWindow = 1.5f;
     private const int LoadPressesRequired = 3;
 
     private float _saveArmedAt;
@@ -17,6 +18,9 @@ public class QuicksaveBehaviour : MonoBehaviour
     private int _loadPresses;
     private bool _capturePending;
     private float _captureStartedAt;
+    private PlayerAgent[]? _wipeTargets;
+    private float _wipeUntil;
+    private bool _wipeErrorLogged;
     private Vector3 _pendingPosition;
     private bool _hadBuffer;
     private int _bufferIdBefore;
@@ -38,8 +42,12 @@ public class QuicksaveBehaviour : MonoBehaviour
             _loadArmedAt = 0f;
             _loadPresses = 0;
             _capturePending = false;
+            _wipeTargets = null;
             return;
         }
+
+        if (_wipeTargets != null)
+            ApplyWipeDamage();
 
         ClearedScanHider.Tick();
 
@@ -136,36 +144,80 @@ public class QuicksaveBehaviour : MonoBehaviour
             return;
         }
 
-        try
+        // Copy first. Dying removes an agent from the live list and the next index would be skipped.
+        var targets = new PlayerAgent[players.Count];
+        var count = 0;
+        for (var i = 0; i < players.Count; i++)
         {
-            var hit = false;
-            for (var i = 0; i < players.Count; i++)
-            {
-                var player = players[i];
-                if (player == null || !player.Alive || player.Damage == null)
-                    continue;
+            var player = players[i];
+            if (!CanWipe(player))
+                continue;
 
-                // The first hit downs a standing player. The second finishes them so the wipe reload starts.
-                player.Damage.FallDamage(WipeDamage);
-                if (player.Alive)
-                    player.Damage.FallDamage(WipeDamage);
-                hit = true;
-            }
-
-            if (!hit)
-            {
-                Notify("Checkpoint load failed");
-                return;
-            }
+            targets[count++] = player;
         }
-        catch (Exception ex)
+
+        if (count == 0)
         {
-            Plugin.LogSource.LogError($"Checkpoint load failed: {ex}");
             Notify("Checkpoint load failed");
             return;
         }
 
+        if (count != targets.Length)
+            Array.Resize(ref targets, count);
+
+        _wipeTargets = targets;
+        _wipeUntil = Time.realtimeSinceStartup + WipeWindow;
+        _wipeErrorLogged = false;
+        ApplyWipeDamage();
         Notify("Loading checkpoint");
+    }
+
+    private void ApplyWipeDamage()
+    {
+        var targets = _wipeTargets;
+        if (targets == null)
+            return;
+
+        var stillAlive = false;
+        for (var i = 0; i < targets.Length; i++)
+        {
+            var player = targets[i];
+            if (!CanWipe(player))
+                continue;
+
+            stillAlive = true;
+            try
+            {
+                // The first hit downs a standing player. Another hit in the same damage segment is
+                // folded into that down, so keep striking until the player is actually dead.
+                player.Damage.FallDamage(WipeDamage);
+                if (CanWipe(player))
+                    player.Damage.FallDamage(WipeDamage);
+            }
+            catch (Exception ex)
+            {
+                if (_wipeErrorLogged)
+                    continue;
+
+                _wipeErrorLogged = true;
+                Plugin.LogSource.LogError($"Checkpoint load failed: {ex}");
+            }
+        }
+
+        if (!stillAlive || Time.realtimeSinceStartup >= _wipeUntil)
+            _wipeTargets = null;
+    }
+
+    private static bool CanWipe(PlayerAgent? player)
+    {
+        try
+        {
+            return player != null && player.Alive && player.Damage != null;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void PumpCapture()
