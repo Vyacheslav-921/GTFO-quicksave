@@ -36,11 +36,15 @@ public class QuicksaveBehaviour : MonoBehaviour
         if (_capturePending && GameStateManager.CurrentStateName == eGameStateName.InLevel)
             PumpCapture();
 
+        DownedBotRestorer.Tick();
+
         if (GameStateManager.CurrentStateName != eGameStateName.InLevel || CheckpointManager.IsReloadingCheckpoint)
         {
             _saveArmedAt = 0f;
             _loadArmedAt = 0f;
             _loadPresses = 0;
+            if (_capturePending)
+                DownedBotRestorer.CancelPending();
             _capturePending = false;
             _wipeTargets = null;
             return;
@@ -112,12 +116,14 @@ public class QuicksaveBehaviour : MonoBehaviour
         _pendingPosition = agent.Position;
         try
         {
+            DownedBotRestorer.CapturePending();
             MapDataManager.CheckpointStoreSyncedGUIObjects();
             RememberBuffer();
             capture.CaptureGameState(eBufferType.Checkpoint);
         }
         catch (Exception ex)
         {
+            DownedBotRestorer.CancelPending();
             Plugin.LogSource.LogError($"Checkpoint capture failed: {ex}");
             Notify("Checkpoint capture failed");
             return;
@@ -237,7 +243,14 @@ public class QuicksaveBehaviour : MonoBehaviour
         }
 
         _capturePending = false;
-        CheckpointManager.StoreCheckpoint(_pendingPosition);
+        try
+        {
+            CheckpointManager.StoreCheckpoint(_pendingPosition);
+        }
+        finally
+        {
+            DownedBotRestorer.FinishPending();
+        }
         if (TryGetCheckpointBuffer(out var buffer))
             Plugin.LogSource.LogInfo($"Checkpoint buffer id={buffer.data.bufferID} valid={buffer.isValid} got={capture.GotBuffer(eBufferType.Checkpoint)}");
         Notify("Checkpoint saved");
@@ -246,6 +259,7 @@ public class QuicksaveBehaviour : MonoBehaviour
     private void FailCapture()
     {
         _capturePending = false;
+        DownedBotRestorer.CancelPending();
         LogBuffers();
         Notify("Checkpoint capture failed");
     }
