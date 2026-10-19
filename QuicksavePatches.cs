@@ -1,4 +1,5 @@
 using HarmonyLib;
+using SNetwork;
 
 namespace GTFOQuicksave;
 
@@ -24,5 +25,18 @@ internal static class LevelCleanupPatch
     public static void Postfix()
     {
         QuicksaveState.HasCheckpoint = false;
+    }
+}
+
+[HarmonyPatch(typeof(CheckpointManager), nameof(CheckpointManager.OnRecallComplete))]
+internal static class RecallCompletePatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(eBufferType bufferType)
+    {
+        if (bufferType != eBufferType.Checkpoint)
+            return;
+
+        ClearedScanHider.Schedule();
     }
 }

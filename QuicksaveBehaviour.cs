@@ -41,6 +41,8 @@ public class QuicksaveBehaviour : MonoBehaviour
             return;
         }
 
+        ClearedScanHider.Tick();
+
         if (!PlayerManager.HasLocalPlayerAgent())
             return;
 
